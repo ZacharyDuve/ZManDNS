@@ -3,14 +3,29 @@ package dns
 import (
 	"errors"
 	"fmt"
+	"net"
 )
 
+type Message struct {
+	originIP *net.IPAddr
+	data     []byte
+}
+
 const MessageLength int = 512
+const minMessageLength int = 12
 
-type Message [MessageLength]byte
+// type Message [MessageLength]byte
 
-func NewMessage() Message {
-	return Message{}
+func NewMessage(originIP *net.IPAddr, data []byte) (*Message, error) {
+	if data == nil {
+		return nil, errors.New("Invalid Message of empty body")
+	} else if len(data) < minMessageLength {
+		return nil, errors.New(fmt.Sprintf("Unable to create message as minimum data length is %d bytes, while data recieved was only %d bytes long", minMessageLength, len(data)))
+	} else if originIP == nil {
+		return nil, errors.New("Invalid Message creation with nil originIP")
+	}
+
+	return &Message{originIP: originIP, data: data}, nil
 }
 
 const (
@@ -19,8 +34,8 @@ const (
 )
 
 func (this Message) Id() uint16 {
-	var id uint16 = (uint16(this[idHighByteIndex]) << 8)
-	id |= uint16(this[idLowByteIndex])
+	var id uint16 = (uint16(this.data[idHighByteIndex]) << 8)
+	id |= uint16(this.data[idLowByteIndex])
 	return id
 }
 
@@ -37,7 +52,7 @@ const (
 )
 
 func (this Message) Type() MessageType {
-	if this[messageTypeByteIndex]&messageTypeByteMask == 0 {
+	if this.data[messageTypeByteIndex]&messageTypeByteMask == 0 {
 		return Query
 	}
 	return Response
@@ -58,7 +73,7 @@ const (
 )
 
 func (this Message) OPCode() (OPCode, error) {
-	opCodeValue := (this[opCodeByteIndex] & opCodeByteMask) >> 3
+	opCodeValue := (this.data[opCodeByteIndex] & opCodeByteMask) >> 3
 
 	if opCodeValue <= 2 {
 		return OPCode(opCodeValue), nil
@@ -73,7 +88,7 @@ const (
 )
 
 func (this Message) IsAuthorativeAnswer() bool {
-	return this[aaByteIndex]&aaByteMask != 0
+	return this.data[aaByteIndex]&aaByteMask != 0
 }
 
 const (
@@ -82,7 +97,7 @@ const (
 )
 
 func (this Message) IsTruncated() bool {
-	return this[tcByteIndex]&tcByteMask != 0
+	return this.data[tcByteIndex]&tcByteMask != 0
 }
 
 const (
@@ -91,7 +106,7 @@ const (
 )
 
 func (this Message) RecursionDesired() bool {
-	return this[rdByteIndex]&rdByteMask != 0
+	return this.data[rdByteIndex]&rdByteMask != 0
 }
 
 const (
@@ -100,7 +115,7 @@ const (
 )
 
 func (this Message) RecursionAvailable() bool {
-	return this[raByteIndex]&raByteMask != 0
+	return this.data[raByteIndex]&raByteMask != 0
 }
 
 type ReturnCode byte
@@ -115,7 +130,7 @@ const (
 )
 
 func (this Message) ReturnCode() (ReturnCode, error) {
-	rc := this[rcByteIndex] & rcByteMask
+	rc := this.data[rcByteIndex] & rcByteMask
 
 	if rc != 0 && rc != 3 {
 		return ReturnCodeUnknown, errors.New(fmt.Sprintf("Error Unknown Return code %d", rc))
@@ -125,8 +140,8 @@ func (this Message) ReturnCode() (ReturnCode, error) {
 }
 
 func (this Message) getUint16FromIndexes(highIndex, lowIndex int) uint16 {
-	v := uint16(this[highIndex]) << 8
-	v |= uint16(this[lowIndex])
+	v := uint16(this.data[highIndex]) << 8
+	v |= uint16(this.data[lowIndex])
 	return v
 }
 

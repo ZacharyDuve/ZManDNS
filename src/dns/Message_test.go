@@ -3,9 +3,10 @@ package dns
 import "testing"
 
 func TestThatMessageWithIdInBytes0And1ReturnsMatchingId(t *testing.T) {
-	m := NewMessage()
-	m[0] = 0xF0
+	data := make([]byte, 12)
+	data[0] = 0xF0
 	m[1] = 0x9C
+	m := NewMessage()
 
 	if uint16(m.Id()) != 0xF09C {
 		t.Log(uint16(m.Id()), 0xF09C)
