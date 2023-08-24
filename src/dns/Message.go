@@ -7,14 +7,16 @@ import (
 )
 
 type Message struct {
-	originIP *net.IPAddr
-	data     []byte
+	originIP  *net.IPAddr
+	data      []byte
+	questions []*QuestionRecord
 }
 
 const MessageLength int = 512
 const minMessageLength int = 12
 
-// type Message [MessageLength]byte
+//In the answer the name starts with c0 for first byte? Second byte points to the index before the name that it references.
+//Interesting as this seems to limit the names to have to exist in the first 256 bytes of the message?
 
 func NewMessage(originIP *net.IPAddr, data []byte) (*Message, error) {
 	if data == nil {
@@ -33,7 +35,7 @@ const (
 	idLowByteIndex  int = 1
 )
 
-func (this Message) Id() uint16 {
+func (this *Message) Id() uint16 {
 	var id uint16 = (uint16(this.data[idHighByteIndex]) << 8)
 	id |= uint16(this.data[idLowByteIndex])
 	return id
@@ -72,7 +74,7 @@ const (
 	opCodeByteIndex int  = 2
 )
 
-func (this Message) OPCode() (OPCode, error) {
+func (this *Message) OPCode() (OPCode, error) {
 	opCodeValue := (this.data[opCodeByteIndex] & opCodeByteMask) >> 3
 
 	if opCodeValue <= 2 {
@@ -87,7 +89,7 @@ const (
 	aaByteMask  byte = 0x04
 )
 
-func (this Message) IsAuthorativeAnswer() bool {
+func (this *Message) IsAuthorativeAnswer() bool {
 	return this.data[aaByteIndex]&aaByteMask != 0
 }
 
@@ -96,7 +98,7 @@ const (
 	tcByteMask  byte = 0x02
 )
 
-func (this Message) IsTruncated() bool {
+func (this *Message) IsTruncated() bool {
 	return this.data[tcByteIndex]&tcByteMask != 0
 }
 
@@ -105,7 +107,7 @@ const (
 	rdByteMask  byte = 0x01
 )
 
-func (this Message) RecursionDesired() bool {
+func (this *Message) RecursionDesired() bool {
 	return this.data[rdByteIndex]&rdByteMask != 0
 }
 
@@ -114,7 +116,7 @@ const (
 	raByteMask  byte = 0x80
 )
 
-func (this Message) RecursionAvailable() bool {
+func (this *Message) RecursionAvailable() bool {
 	return this.data[raByteIndex]&raByteMask != 0
 }
 
@@ -129,7 +131,7 @@ const (
 	rcByteMask  byte = 0x0f
 )
 
-func (this Message) ReturnCode() (ReturnCode, error) {
+func (this *Message) ReturnCode() (ReturnCode, error) {
 	rc := this.data[rcByteIndex] & rcByteMask
 
 	if rc != 0 && rc != 3 {
@@ -139,7 +141,7 @@ func (this Message) ReturnCode() (ReturnCode, error) {
 	return ReturnCode(rc), nil
 }
 
-func (this Message) getUint16FromIndexes(highIndex, lowIndex int) uint16 {
+func (this *Message) getUint16FromIndexes(highIndex, lowIndex int) uint16 {
 	v := uint16(this.data[highIndex]) << 8
 	v |= uint16(this.data[lowIndex])
 	return v
@@ -150,7 +152,7 @@ const (
 	numQuestionsLowIndex  int = 5
 )
 
-func (this Message) NumberQuestions() uint16 {
+func (this *Message) NumberQuestions() uint16 {
 	return this.getUint16FromIndexes(numQuestionsHighIndex, numQuestionsLowIndex)
 }
 
@@ -159,7 +161,7 @@ const (
 	numAnswersLowIndex  int = 7
 )
 
-func (this Message) NumberAnswers() uint16 {
+func (this *Message) NumberAnswers() uint16 {
 	return this.getUint16FromIndexes(numAnswersHighIndex, numAnswersLowIndex)
 }
 
@@ -168,7 +170,7 @@ const (
 	numAARecordsLowIndex  = 9
 )
 
-func (this Message) NumberAuthorativeAnswers() uint16 {
+func (this *Message) NumberAuthorativeAnswers() uint16 {
 	return this.getUint16FromIndexes(numAARecordsHighIndex, numAARecordsLowIndex)
 }
 
@@ -177,6 +179,17 @@ const (
 	numAdditionalAnswersLowIndex  = 11
 )
 
-func (this Message) NumberAdditionalAnswers() uint16 {
+func (this *Message) NumberAdditionalAnswers() uint16 {
 	return this.getUint16FromIndexes(numAdditionalAnswersHighIndex, numAdditionalAnswersLowIndex)
+}
+
+func (this *Message) Questions() []*QuestionRecord {
+	if this.NumberQuestions() > 0 && this.questions == nil {
+		//Parse out the questions because we have some but haven't parsed them yet
+	}
+	return this.questions
+}
+
+func (this *Message) Data() []byte {
+	return this.data
 }
